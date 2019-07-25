@@ -705,6 +705,19 @@ static void respring() {
 #pragma mark Constructor
 ///////////////////////////////////////////////////////////////
 
+void (^startOrStopUpdates)(NSNotification *) = ^(NSNotification *notification) {
+    NSString *name = notification.name;
+    NSDictionary *userInfo = notification.userInfo;
+
+    if ([name isEqualToString:@"SBLockScreenUndimmedNotification"] || [name isEqualToString:@"SBHomescreenIconsWillAppearNotification"]) {
+        // Begin updates because SB visible
+        [[XIWidgetManager sharedInstance] noteDeviceDidExitSleep];
+    } else if ([name isEqualToString:@"SBLockScreenDimmedNotification"] || (userInfo && ![userInfo[@"kSBNotificationKeyDisplayIdentifier"] isEqual:@""])) {
+        // Stop updates because SB hidden
+        [[XIWidgetManager sharedInstance] noteDeviceDidEnterSleep];
+    }
+};
+
 %ctor {
     Xlog(@"Injecting...");
     // Load Weather.framework if needed
@@ -714,4 +727,11 @@ static void respring() {
     //listen for respring
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)respring, CFSTR("com.junesiphone.xeninfosettings/respring"), NULL, 0);
     %init;
+
+    // Register for notifications (Do these work still??)
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    [center addObserverForName:@"SBDisplayDidLaunchNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
+    [center addObserverForName:@"SBHomescreenIconsWillAppearNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
+    [center addObserverForName:@"SBLockScreenUndimmedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
+    [center addObserverForName:@"SBLockScreenDimmedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
 }
