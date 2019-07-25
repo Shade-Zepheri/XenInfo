@@ -13,7 +13,8 @@ include $(THEOS)/makefiles/common.mk
 
 # Get Sources
 SOURCES  = $(shell find Tweak -name '*.m')
-SOURCES += $(shell find Tweak -name '*.xm')
+SOURCES += $(shell find Tweak -name '*.x')
+SOURCES += $(shell find ThirdParty -name '*.m')
 
 TWEAK_NAME = XenInfo
 XenInfo_FILES = $(SOURCES)
