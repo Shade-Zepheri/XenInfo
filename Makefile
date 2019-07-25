@@ -1,19 +1,25 @@
-export THEOS_DEVICE_IP=localhost -p 2222
-TARGET = iphone:9.2:9.2
-ARCHS =  armv7 armv7s arm64 arm64e
-FINALPACKAGE = 1
+export TARGET = iphone:latest:11.0
+export ARCHS = arm64e
+
+INSTALL_TARGET_PROCESSES = Preferences
+
+ifneq ($(RESPRING),0)
+	INSTALL_TARGET_PROCESSES += SpringBoard
+endif
+
+export ADDITIONAL_CFLAGS = -fobjc-arc
 
 include $(THEOS)/makefiles/common.mk
 
+# Get Sources
+SOURCES  = $(shell find Tweak -name '*.m')
+SOURCES += $(shell find Tweak -name '*.xm')
+
 TWEAK_NAME = XenInfo
-XenInfo_FILES = Tweak/Tweak.xm Tweak/Internal/XIWidgetManager.m Tweak/System/XISystem.m Tweak/Music/XIMusic.m Tweak/Weather/XIWeather.m Tweak/Weather/XITWCWeather.m Tweak/Weather/XIWAWeather.m Tweak/Battery/XIInfoStats.m Tweak/Events/XIEvents.m Tweak/Reminders/XIReminders.m Tweak/Alarms/XIAlarms.m Tweak/Statusbar/XIStatusBar.m ThirdParty/Reachability/Reachability.m
-XenInfo_LDFLAGS += -Wl,-segalign,4000
+XenInfo_FILES = $(SOURCES)
 XenInfo_FRAMEWORKS = UIKit
-XenInfo_CFLAGS = -fobjc-arc
+
+SUBPROJECTS += xeninfosettings
 
 include $(THEOS_MAKE_PATH)/tweak.mk
-
-after-install::
-	install.exec "killall -9 SpringBoard"
-SUBPROJECTS += xeninfosettings
 include $(THEOS_MAKE_PATH)/aggregate.mk
