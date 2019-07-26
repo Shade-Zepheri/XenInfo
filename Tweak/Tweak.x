@@ -46,12 +46,14 @@ static NSString *nsDomainString = @"com.junesiphone.xeninfosettings";
 @end
 
 @interface SpringBoard : NSObject
-    - (void)_simulateLockButtonPress;
-    - (void)_simulateHomeButtonPress;
-    - (void)_relaunchSpringBoardNow;
-    +(id)sharedInstance;
-    -(id)_accessibilityFrontMostApplication;
-    -(void)clearMenuButtonTimer;
+- (void)_simulateLockButtonPress;
+- (void)_simulateHomeButtonPress;
+- (void)_relaunchSpringBoardNow;
+- (id)_accessibilityFrontMostApplication;
+- (void)clearMenuButtonTimer;
+
+- (BOOL)isShowingHomescreen;
+
 @end
 
 ///////////////////////////////////////////////////////////////
@@ -537,65 +539,6 @@ static long repeat;
 }
 %end
 
-// iOS 9
-%hook SBLockScreenViewController
-
--(void)_handleDisplayTurnedOff {
-    %orig;
-    [[XIWidgetManager sharedInstance] noteDeviceDidEnterSleep];
-}
-
-// When in a phone call, this code is not run.
-- (void)_handleDisplayTurnedOnWhileUILocked:(id)locked {
-    [[XIWidgetManager sharedInstance] noteDeviceDidExitSleep];
-    %orig;
-}
-
-%end
-
-// iOS 10
-%hook SBLockScreenManager
-
-- (void)_handleBacklightLevelChanged:(NSNotification*)arg1 {
-    %orig;
-    
-    if ([UIDevice currentDevice].systemVersion.floatValue >= 10.0) {
-        NSDictionary *userInfo = arg1.userInfo;
-        
-        CGFloat newBacklight = [[userInfo objectForKey:@"SBBacklightNewFactorKey"] floatValue];
-        CGFloat oldBacklight = [[userInfo objectForKey:@"SBBacklightOldFactorKey"] floatValue];
-        
-        if (newBacklight == 0.0) {
-            [[XIWidgetManager sharedInstance] noteDeviceDidEnterSleep];
-        } else if (oldBacklight == 0.0 && newBacklight > 0.0) {
-            [[XIWidgetManager sharedInstance] noteDeviceDidExitSleep];
-        }
-    }
-}
-
-%end
-
-// iOS 11
-%hook SBScreenWakeAnimationController
-
-- (void)_handleAnimationCompletionIfNecessaryForWaking:(_Bool)wokeLS {
-    if (!wokeLS) {
-        [[XIWidgetManager sharedInstance] noteDeviceDidEnterSleep];
-    }
-    
-    %orig;
-}
-
-- (void)_startWakeAnimationsForWaking:(_Bool)arg1 animationSettings:(id)arg2 {
-    if (arg1) {
-        [[XIWidgetManager sharedInstance] noteDeviceDidExitSleep];
-    }
-    
-    %orig;
-}
-
-%end
-
 ///////////////////////////////////////////////////////////////
 #pragma mark Alarms
 ///////////////////////////////////////////////////////////////
@@ -707,12 +650,11 @@ static void respring() {
 
 void (^startOrStopUpdates)(NSNotification *) = ^(NSNotification *notification) {
     NSString *name = notification.name;
-    NSDictionary *userInfo = notification.userInfo;
-
+    BOOL showingHomescreen = [(SpringBoard *)[UIApplication sharedApplication] isShowingHomescreen];
     if ([name isEqualToString:@"SBLockScreenUndimmedNotification"] || [name isEqualToString:@"SBHomescreenIconsWillAppearNotification"]) {
         // Begin updates because SB visible
         [[XIWidgetManager sharedInstance] noteDeviceDidExitSleep];
-    } else if ([name isEqualToString:@"SBLockScreenDimmedNotification"] || (userInfo && ![userInfo[@"kSBNotificationKeyDisplayIdentifier"] isEqual:@""])) {
+    } else if ([name isEqualToString:@"SBLockScreenDimmedNotification"] || ([name isEqualToString:@"SBHomescreenDisplayChangedNotification"] && !showingHomescreen)) {
         // Stop updates because SB hidden
         [[XIWidgetManager sharedInstance] noteDeviceDidEnterSleep];
     }
@@ -730,7 +672,7 @@ void (^startOrStopUpdates)(NSNotification *) = ^(NSNotification *notification) {
 
     // Register for notifications (Do these work still??)
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
-    [center addObserverForName:@"SBDisplayDidLaunchNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
+    [center addObserverForName:@"SBHomescreenDisplayChangedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
     [center addObserverForName:@"SBHomescreenIconsWillAppearNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
     [center addObserverForName:@"SBLockScreenUndimmedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
     [center addObserverForName:@"SBLockScreenDimmedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:startOrStopUpdates];
