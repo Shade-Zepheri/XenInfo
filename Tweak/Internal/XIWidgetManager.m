@@ -98,14 +98,15 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
         }
         
         // Setup network connectivity notifications
-        Reachability* reach = [Reachability reachabilityWithHostname:@"www.google.com"];
+        Reachability *reach = [Reachability reachabilityWithHostname:@"www.google.com"];
         
         reach.reachableBlock = ^(Reachability *reach) {
             for (NSString *topic in self.widgetDataProviders.allKeys) {
                 id<XIWidgetDataProvider> provider = [self.widgetDataProviders objectForKey:topic];
                     
-                if ([provider respondsToSelector:@selector(networkWasConnected)])
+                if ([provider respondsToSelector:@selector(networkWasConnected)]) {
                     [provider networkWasConnected];
+                }
             }
         };
         
@@ -113,8 +114,9 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
             for (NSString *topic in self.widgetDataProviders.allKeys) {
                 id<XIWidgetDataProvider> provider = [self.widgetDataProviders objectForKey:topic];
                 
-                if ([provider respondsToSelector:@selector(networkWasDisconnected)])
+                if ([provider respondsToSelector:@selector(networkWasDisconnected)]) {
                     [provider networkWasDisconnected];
+                }
             }
         };
         
@@ -126,7 +128,7 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
 }
 
 -(NSMutableDictionary*)_populateWidgetSettings{
-    NSMutableDictionary *settingsDict = [@{} mutableCopy];
+    NSMutableDictionary *settingsDict = [NSMutableDictionary dictionary];
     NSNumber *alarms = (NSNumber *)[[NSUserDefaults standardUserDefaults] objectForKey:@"alarms" inDomain:nsDomainString];
     NSNumber *battery = (NSNumber *)[[NSUserDefaults standardUserDefaults] objectForKey:@"battery" inDomain:nsDomainString];
     NSNumber *events = (NSNumber *)[[NSUserDefaults standardUserDefaults] objectForKey:@"events" inDomain:nsDomainString];
@@ -159,7 +161,7 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
 }
 
 - (NSDictionary*)_populateWidgetDataProviders {
-    NSMutableDictionary *dict = [@{} mutableCopy];
+    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
     NSMutableDictionary* settingsDict = self.widgetSettings;
     
     /*****************************************************/
@@ -219,6 +221,9 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
 
 - (void)registerWidget:(id)widget {
     // TODO: Check this widget implements mainUpdate().
+    if ([self.registeredWidgets containsObject:widget]) {
+        return;
+    }
     
     [self.registeredWidgets addObject:widget];
     
@@ -227,8 +232,11 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
 }
 
 - (void)unregisterWidget:(id)widget {
-    if ([self.registeredWidgets containsObject:widget])
-        [self.registeredWidgets removeObject:widget];
+    if (![self.registeredWidgets containsObject:widget]) {
+        return;
+    }
+
+    [self.registeredWidgets removeObject:widget];
 }
 
 - (void)widget:(id)widget didRequestAction:(NSString*)action withParameter:(NSString*)parameter {
@@ -296,7 +304,7 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
 }
 
 - (void)updateWidgetsWithNewData:(NSString*)javascriptString onTopic:(NSString*)topic {
-    if (YES == self.deviceSleepState) {
+    if (self.deviceSleepState) {
         // Save this update for when the device wakes, to avoid any weirdness like screen freezes!
         // Only store the latest update
         [self.queuedUpdatesWhileDeviceSleeping setObject:javascriptString forKey:topic];
@@ -314,7 +322,7 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
     
     // Loop over widget array, and call update as required.
     for (id widget in self.registeredWidgets) {
-        if ([[widget class] isEqual:[UIWebView class]]) {
+        if ([widget isKindOfClass:[UIWebView class]]) {
             // Update JS variables
             // Ensure we update widgets on the main thread
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -324,7 +332,7 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
                 NSString* function = [NSString stringWithFormat:@"mainUpdate('%@')", topic];
                 [widget stringByEvaluatingJavaScriptFromString:function];
             });
-        } else if ([[widget class] isEqual:[WKWebView class]]) {
+        } else if ([widget isKindOfClass:[WKWebView class]]) {
             // Update JS variables
             dispatch_async(dispatch_get_main_queue(), ^{
                 [widget evaluateJavaScript:javascriptString completionHandler:^(id object, NSError *error) {}];
@@ -349,14 +357,14 @@ void XenInfoLog(const char *file, int lineNumber, const char *functionName, NSSt
         
         NSString *cachedData = [provider requestCachedData];
         
-        if ([[widget class] isEqual:[UIWebView class]]) {
+        if ([widget isKindOfClass:[UIWebView class]]) {
             // Update JS variables
             [widget stringByEvaluatingJavaScriptFromString:cachedData];
             
             // Notify of new change to variables
             NSString* function = [NSString stringWithFormat:@"mainUpdate('%@')", topic];
             [widget stringByEvaluatingJavaScriptFromString:function];
-        } else if ([[widget class] isEqual:[WKWebView class]]) {
+        } else if ([widget isKindOfClass:[WKWebView class]]) {
             // Update JS variables
             [widget evaluateJavaScript:cachedData completionHandler:^(id object, NSError *error) {}];
             
